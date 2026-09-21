@@ -1,0 +1,6 @@
+{
+  "name": "SubWise AI",
+  "description": "Autonomous SaaS and AI subscription watchdog with real-time spend analytics, redundancy optimization, and intelligent budget precision.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
