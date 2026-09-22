@@ -53,3 +53,10 @@ export interface UrgentRenewal {
   category: string;
   autoChargeRisk: 'imminent' | 'standard';
 }
+
+export interface SpendingCapConfig {
+  monthlyCap: number;
+  alertAt80: boolean;
+  alertAt100: boolean;
+  isEnabled: boolean;
+}

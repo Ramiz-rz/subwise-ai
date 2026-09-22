@@ -12,7 +12,8 @@ import {
   Subscription, 
   AiOptimizerInsight, 
   BillingCycle, 
-  ViewTab 
+  ViewTab,
+  SpendingCapConfig
 } from './types';
 
 // Components
@@ -40,6 +41,7 @@ import { AuditModal } from './components/modals/AuditModal';
 import { NotificationsModal } from './components/modals/NotificationsModal';
 import { SubscriptionDetailModal } from './components/modals/SubscriptionDetailModal';
 import { InvoicesModal } from './components/modals/InvoicesModal';
+import { BudgetCapModal } from './components/modals/BudgetCapModal';
 
 export default function App() {
   const [subscriptions, setSubscriptions] = useState<Subscription[]>(INITIAL_SUBSCRIPTIONS);
@@ -57,7 +59,16 @@ export default function App() {
   const [isAuditModalOpen, setIsAuditModalOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isInvoicesOpen, setIsInvoicesOpen] = useState(false);
+  const [isBudgetCapOpen, setIsBudgetCapOpen] = useState(false);
   const [selectedSub, setSelectedSub] = useState<Subscription | null>(null);
+
+  // Monthly Spending Cap Configuration
+  const [budgetConfig, setBudgetConfig] = useState<SpendingCapConfig>({
+    monthlyCap: 200,
+    alertAt80: true,
+    alertAt100: true,
+    isEnabled: true
+  });
 
   // Spend calculations
   const activeSubs = subscriptions.filter(s => s.status === 'active');
@@ -67,6 +78,15 @@ export default function App() {
   const monthlySpend = isSimulatedTelemetry ? rawMonthlySpend : 0.00;
   const annualRunRate = monthlySpend * 12;
 
+  // Active stack spend used for budget cap evaluation
+  const effectiveBudgetSpend = isSimulatedTelemetry ? monthlySpend : rawMonthlySpend;
+  const isBudgetActive = budgetConfig.isEnabled && budgetConfig.monthlyCap > 0;
+  const budgetRatio = isBudgetActive ? (effectiveBudgetSpend / budgetConfig.monthlyCap) * 100 : 0;
+  const hasCapBreached = isBudgetActive && budgetConfig.alertAt100 && budgetRatio >= 100;
+  const has80Warning = isBudgetActive && budgetConfig.alertAt80 && budgetRatio >= 80 && !hasCapBreached;
+
+  const unreadAlertCount = 2 + (hasCapBreached || has80Warning ? 1 : 0);
+
   const rawAiSpend = activeSubs
     .filter(s => s.isAiTool)
     .reduce((acc, curr) => acc + curr.amount, 0);
@@ -74,6 +94,7 @@ export default function App() {
   const aiToolPercentage = (isSimulatedTelemetry && monthlySpend > 0)
     ? Math.round((aiToolSpend / monthlySpend) * 100)
     : 0;
+
 
   // Identified savings matches the screenshot ($44.98)
   const identifiedSavings = 44.98;
@@ -139,9 +160,12 @@ export default function App() {
       <Header
         onOpenNotifications={() => setIsNotificationsOpen(true)}
         onOpenInvoices={() => setIsInvoicesOpen(true)}
-        unreadCount={2}
+        onOpenBudgetCap={() => setIsBudgetCapOpen(true)}
+        unreadCount={unreadAlertCount}
         isSimulatedTelemetry={isSimulatedTelemetry}
         onToggleTelemetry={() => setIsSimulatedTelemetry(!isSimulatedTelemetry)}
+        budgetConfig={budgetConfig}
+        currentMonthlySpend={effectiveBudgetSpend}
       />
 
       {/* Main Content Area */}
@@ -164,6 +188,8 @@ export default function App() {
               identifiedSavings={identifiedSavings}
               perspective={perspective}
               onSimulateCancellation={() => setCurrentTab('savings')}
+              budgetConfig={budgetConfig}
+              onOpenBudgetCapModal={() => setIsBudgetCapOpen(true)}
             />
 
             {/* Quick Tab Pills (Dashboard / Subscriptions 8) */}
@@ -244,6 +270,9 @@ export default function App() {
         {currentTab === 'analytics' && (
           <AnalyticsView
             subscriptions={subscriptions}
+            budgetConfig={budgetConfig}
+            onOpenBudgetCapModal={() => setIsBudgetCapOpen(true)}
+            initialAnnualized={perspective === 'annual'}
           />
         )}
       </main>
@@ -279,6 +308,10 @@ export default function App() {
         onClose={() => setIsNotificationsOpen(false)}
         urgentSubscriptions={subscriptions.filter(s => s.daysUntilRenewal <= 7 && s.status === 'active')}
         onSelectSubscription={(sub) => setSelectedSub(sub)}
+        budgetConfig={budgetConfig}
+        currentMonthlySpend={effectiveBudgetSpend}
+        onOpenBudgetCapModal={() => setIsBudgetCapOpen(true)}
+        onNavigateToSavings={() => setCurrentTab('savings')}
       />
 
       <SubscriptionDetailModal
@@ -294,6 +327,14 @@ export default function App() {
         isOpen={isInvoicesOpen}
         onClose={() => setIsInvoicesOpen(false)}
         subscriptions={subscriptions}
+      />
+
+      <BudgetCapModal
+        isOpen={isBudgetCapOpen}
+        onClose={() => setIsBudgetCapOpen(false)}
+        config={budgetConfig}
+        onSaveConfig={(updated) => setBudgetConfig(updated)}
+        currentMonthlySpend={effectiveBudgetSpend}
       />
     </div>
   );

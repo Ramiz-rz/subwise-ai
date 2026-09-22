@@ -1,24 +1,39 @@
 import React from 'react';
-import { X, Bell, AlertTriangle, Clock, CheckCircle2, ArrowRight } from 'lucide-react';
-import { Subscription } from '../../types';
+import { X, Bell, AlertTriangle, Clock, CheckCircle2, ArrowRight, Target, Sliders, ShieldAlert } from 'lucide-react';
+import { Subscription, SpendingCapConfig } from '../../types';
 
 interface NotificationsModalProps {
   isOpen: boolean;
   onClose: () => void;
   urgentSubscriptions: Subscription[];
   onSelectSubscription: (sub: Subscription) => void;
+  budgetConfig?: SpendingCapConfig;
+  currentMonthlySpend?: number;
+  onOpenBudgetCapModal?: () => void;
+  onNavigateToSavings?: () => void;
 }
 
 export const NotificationsModal: React.FC<NotificationsModalProps> = ({
   isOpen,
   onClose,
   urgentSubscriptions,
-  onSelectSubscription
+  onSelectSubscription,
+  budgetConfig,
+  currentMonthlySpend = 0,
+  onOpenBudgetCapModal,
+  onNavigateToSavings
 }) => {
   if (!isOpen) return null;
 
+  // Evaluate budget thresholds
+  const isBudgetActive = budgetConfig?.isEnabled && (budgetConfig.monthlyCap || 0) > 0;
+  const monthlyCap = budgetConfig?.monthlyCap || 0;
+  const budgetRatio = monthlyCap > 0 ? (currentMonthlySpend / monthlyCap) * 100 : 0;
+  const isCapBreached = isBudgetActive && budgetConfig?.alertAt100 && budgetRatio >= 100;
+  const is80Exceeded = isBudgetActive && budgetConfig?.alertAt80 && budgetRatio >= 80 && !isCapBreached;
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-in fade-in duration-150">
       <div className="w-full max-w-md rounded-2xl bg-[#0d1322] border border-white/10 shadow-[0_20px_60px_rgba(0,0,0,0.85)] overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-white/[0.08] bg-[#111728]">
@@ -34,9 +49,110 @@ export const NotificationsModal: React.FC<NotificationsModalProps> = ({
         </div>
 
         {/* Content */}
-        <div className="p-4 space-y-3 font-['Inter'] max-h-[75vh] overflow-y-auto">
+        <div className="p-4 space-y-3.5 font-['Inter'] max-h-[75vh] overflow-y-auto">
+          {/* 100% Critical Cap Exceeded Alert */}
+          {isCapBreached && (
+            <div 
+              id="budget-cap-exceeded-alert"
+              className="p-3.5 rounded-xl bg-rose-950/40 border border-rose-500/50 shadow-[0_0_15px_rgba(244,63,94,0.15)] space-y-2"
+            >
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <div className="p-1 rounded-md bg-rose-900/60 text-rose-400">
+                    <ShieldAlert className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <span className="text-xs font-bold text-rose-200 block font-['Plus_Jakarta_Sans']">
+                      Critical: Monthly Spending Cap Exceeded!
+                    </span>
+                    <span className="text-[10px] text-rose-300/80 font-['JetBrains_Mono']">
+                      Cap: ${monthlyCap.toFixed(2)} · Current: ${currentMonthlySpend.toFixed(2)} ({budgetRatio.toFixed(0)}%)
+                    </span>
+                  </div>
+                </div>
+                <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-rose-900 text-rose-200 border border-rose-500/40 font-['JetBrains_Mono'] shrink-0">
+                  100% Overrun
+                </span>
+              </div>
+
+              <p className="text-[11px] text-rose-200/90 leading-relaxed">
+                Active subscriptions exceed your monthly spending cap by <strong className="text-white">${(currentMonthlySpend - monthlyCap).toFixed(2)}</strong>. Review redundant licenses to reduce commitment.
+              </p>
+
+              <div className="flex items-center gap-2 pt-1">
+                {onOpenBudgetCapModal && (
+                  <button
+                    onClick={() => {
+                      onClose();
+                      onOpenBudgetCapModal();
+                    }}
+                    className="flex-1 py-1 px-2.5 rounded-lg bg-rose-900/60 hover:bg-rose-800/80 text-white text-[11px] font-semibold transition-colors flex items-center justify-center gap-1"
+                  >
+                    <Sliders className="w-3 h-3" />
+                    <span>Adjust Cap</span>
+                  </button>
+                )}
+                {onNavigateToSavings && (
+                  <button
+                    onClick={() => {
+                      onClose();
+                      onNavigateToSavings();
+                    }}
+                    className="flex-1 py-1 px-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-[11px] font-semibold transition-colors flex items-center justify-center gap-1"
+                  >
+                    <span>Simulate Savings</span>
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* 80% Warning Alert */}
+          {is80Exceeded && (
+            <div 
+              id="budget-cap-warning-alert"
+              className="p-3.5 rounded-xl bg-amber-950/40 border border-amber-500/50 shadow-[0_0_15px_rgba(245,158,11,0.1)] space-y-2"
+            >
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <div className="p-1 rounded-md bg-amber-900/60 text-amber-400">
+                    <AlertTriangle className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <span className="text-xs font-bold text-amber-200 block font-['Plus_Jakarta_Sans']">
+                      Warning: 80% Monthly Cap Threshold Reached
+                    </span>
+                    <span className="text-[10px] text-amber-300/80 font-['JetBrains_Mono']">
+                      Cap: ${monthlyCap.toFixed(2)} · Current: ${currentMonthlySpend.toFixed(2)} ({budgetRatio.toFixed(0)}%)
+                    </span>
+                  </div>
+                </div>
+                <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-amber-900 text-amber-200 border border-amber-500/40 font-['JetBrains_Mono'] shrink-0">
+                  80% Alert
+                </span>
+              </div>
+
+              <p className="text-[11px] text-amber-200/90 leading-relaxed">
+                You have consumed {budgetRatio.toFixed(1)}% of your monthly cap. Only <strong className="text-white">${Math.max(0, monthlyCap - currentMonthlySpend).toFixed(2)}</strong> cushion remains before budget overrun.
+              </p>
+
+              {onOpenBudgetCapModal && (
+                <button
+                  onClick={() => {
+                    onClose();
+                    onOpenBudgetCapModal();
+                  }}
+                  className="w-full py-1 px-2.5 rounded-lg bg-amber-900/60 hover:bg-amber-800/80 text-amber-100 text-[11px] font-semibold transition-colors flex items-center justify-center gap-1.5"
+                >
+                  <Target className="w-3 h-3" />
+                  <span>Manage Monthly Spending Cap</span>
+                </button>
+              )}
+            </div>
+          )}
+
           {/* Urgent charge alerts */}
-          <div className="text-[11px] font-semibold text-slate-400 uppercase font-['JetBrains_Mono']">
+          <div className="text-[11px] font-semibold text-slate-400 uppercase font-['JetBrains_Mono'] pt-1">
             Impending Auto-Charges (Next 7 Days)
           </div>
 
@@ -85,7 +201,20 @@ export const NotificationsModal: React.FC<NotificationsModalProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="p-3 bg-[#111728] border-t border-white/[0.06] flex justify-end">
+        <div className="p-3 bg-[#111728] border-t border-white/[0.06] flex items-center justify-between">
+          {onOpenBudgetCapModal && (
+            <button
+              onClick={() => {
+                onClose();
+                onOpenBudgetCapModal();
+              }}
+              className="text-[11px] text-indigo-400 hover:text-indigo-300 flex items-center gap-1 font-['JetBrains_Mono']"
+            >
+              <Target className="w-3 h-3" />
+              <span>Cap: ${monthlyCap.toFixed(0)}/mo</span>
+            </button>
+          )}
+
           <button
             onClick={onClose}
             className="px-4 py-1.5 rounded-lg bg-[#182136] hover:bg-[#202c48] text-xs font-semibold text-white"
@@ -97,3 +226,4 @@ export const NotificationsModal: React.FC<NotificationsModalProps> = ({
     </div>
   );
 };
+
